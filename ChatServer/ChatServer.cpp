@@ -2,8 +2,8 @@
 #include <thread>
 #include <vector>
 #include <mutex>
-#include "../common/Packet.h"
-#include "../common/SocketHandler.h"
+
+#include "ChatServer.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -14,77 +14,73 @@
 std::vector<SOCKET> clients;
 std::mutex clientsMutex;
 
-// 서버 메인 루프
-int main() {
-    WSADATA wsa;
-    SOCKET serverSocket, clientSocket;
-    struct sockaddr_in serverAddr, clientAddr;
-    int clientAddrLen = sizeof(clientAddr);
-    char buffer[BUFFER_SIZE];
 
-    // 윈속 초기화
-    WSAStartup(MAKEWORD(2, 2), &wsa);
+ChatServer::ChatServer() 
+    : clientCount(0) 
+{
+    memset(clientSockets, 0, sizeof(clientSockets));
+}
 
-    // 서버 소켓 생성
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket == INVALID_SOCKET) {
-        printf("Socket creation failed\n");
-        return 1;
-    }
+bool ChatServer::startServer(int port) 
+{
+    if (!initializeSocket()) return false;
+    if (!createSocket()) return false;
 
-    // 서버 주소 구조체 설정
+    // 서버 주소 설정
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(SERVER_PORT);
+    serverAddr.sin_port = htons(port);
 
-    // 서버 소켓 바인딩
-    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        printf("Bind failed\n");
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
+    // 소켓 바인딩
+    if (bind(socketDescriptor, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
+        return false;
     }
 
-    // 서버 소켓 리스닝
-        //클라이언트 접속대기
-    if (listen(serverSocket, 3) == SOCKET_ERROR) {
-        std::cerr << "리스닝 실패" << std::endl;
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
+    // 소켓 리스닝
+    if (listen(socketDescriptor, 3) == SOCKET_ERROR) {
+        std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
+        return false;
     }
-    
-    std::cout << "Server is listening on port 포트: " << SERVER_PORT << std::endl;    
 
-    while (1) {
-        clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrLen);
-        if (clientSocket == INVALID_SOCKET) {
-            std::cerr << "연결 수락 실패" << std::endl;
-            closesocket(serverSocket);
-            WSACleanup();
-            return 1;
+    std::cout << "Server started on port " << port << std::endl;
+    return true;
+}
+
+void ChatServer::acceptClient() {
+    SOCKET newSocket;
+    sockaddr_in clientAddr;
+    int addrSize = sizeof(clientAddr);
+
+    newSocket = accept(socketDescriptor, (struct sockaddr*)&clientAddr, &addrSize);
+    if (newSocket == INVALID_SOCKET) {
+        std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+    }
+    else {
+        clientSockets[clientCount++] = newSocket;
+        std::cout << "Client connected. Total clients: " << clientCount << std::endl;
+    }
+}
+
+// 모든 클라이언트에게 메시지 브로드캐스트
+void ChatServer::broadcastMessage(const char* message, PacketHeader header) {
+    for (int i = 0; i < clientCount; i++) {
+        send(clientSockets[i], (const char*)&header, sizeof(PacketHeader), 0);
+        send(clientSockets[i], message, header.dataLength, 0);
+    }
+}
+
+// 메시지를 받아 브로드캐스트
+void ChatServer::receiveAndBroadcast() {
+    char buffer[1024];
+    PacketHeader header;
+
+    for (int i = 0; i < clientCount; i++) {
+        int recvSize = recv(clientSockets[i], (char*)&header, sizeof(PacketHeader), 0);
+        if (recvSize > 0) {
+            recv(clientSockets[i], buffer, header.dataLength, 0);
+            std::cout << "Message received from client " << header.senderID << ": " << buffer << std::endl;
+            broadcastMessage(buffer, header);
         }
-
-        // 클라이언트의 패킷 수신
-        int recvSize = recv(clientSocket, buffer, BUFFER_SIZE, 0);
-        if (recvSize == SOCKET_ERROR) {
-            std::cerr << "연결 패킷 수신 실패" << std::endl;
-            closesocket(serverSocket);
-            WSACleanup();
-            return 1;
-        }
-
-        std::cout << "클라이언트 연결됨!" << std::endl;
-
-        std::lock_guard<std::mutex> lock(clientsMutex);
-        clients.push_back(clientSocket);
-
-        //스래드 생성 클라이언트 메세지처리		
-        std::thread clientThread(handleReceivedPacket, clientSocket);
-        clientThread.detach();
     }
-
-    closesocket(serverSocket);
-    WSACleanup();
-    return 0;
 }

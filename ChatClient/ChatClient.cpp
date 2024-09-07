@@ -1,75 +1,48 @@
 ﻿#include <string>
 #include <thread>
 #include <ws2tcpip.h>
-#include "../common/Packet.h"
-#include "../common/SocketHandler.h"
-
-#pragma comment(lib, "ws2_32.lib")
-
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 8888
-#define BUFFER_SIZE 1024
+#include "ChatClient.h"
 
 
-int main() {
-    WSADATA wsa;
-    SOCKET clientSocket;
-    struct sockaddr_in serverAddr;
-    char buffer[BUFFER_SIZE];
-    uint32_t userID = (uint32_t)_getpid(); // 예시 유저 ID
-    const char* username = "testuser" + rand(); // 예시 유저 이름
-
-    // 윈속 초기화
-    WSAStartup(MAKEWORD(2, 2), &wsa);
-
-    // 클라이언트 소켓 생성
-    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (clientSocket == INVALID_SOCKET) {
-        printf("Socket creation failed\n");
-        return 1;
-    }
+bool ChatClient::connectToServer(const char* serverIP, int port) {
+    if (!initializeSocket()) return false;
+    if (!createSocket()) return false;
 
     // 서버 주소 설정
     serverAddr.sin_family = AF_INET;
-    //serverAddr.sin_addr.s_addr = inet_addr(SERVER_IP);
-    inet_pton(AF_INET, SERVER_IP, &serverAddr.sin_addr);
-
-    serverAddr.sin_port = htons(SERVER_PORT);
+    serverAddr.sin_addr.s_addr = inet_addr(serverIP);
+    serverAddr.sin_port = htons(port);
 
     // 서버에 연결
-    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        printf("Connection failed\n");
-        closesocket(clientSocket);
-        WSACleanup();
-        return 1;
+    if (connect(socketDescriptor, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cerr << "Connection failed: " << WSAGetLastError() << std::endl;
+        return false;
     }
 
-    printf("Connected to server\n");
-
-    // 로그인 요청 패킷 전송    
-    sendLoginPacket(clientSocket, username, userID);
-
-    //스래드 생성 클라이언트 메세지처리		
-    std::thread clientThread(handleReceivedPacket, clientSocket);
-    clientThread.detach();
-
- 
-    std::string message;
-
-    while (1) {
-        // 메시지 입력
-        std::cout << "메시지 입력 ('exit' 입력 시 종료): ";
-        std::getline(std::cin, message);  // 사용자로부터 입력받음      
-
-        if (message == "exit") {
-            break;  // 'exit' 입력 시 반복문 탈출
-        }
-
-        //일반채팅 패킷
-        sendChatPacket(clientSocket, message.c_str(), userID, 0);
-    }
-
-    closesocket(clientSocket);
-    WSACleanup();
-    return 0;
+    std::cout << "Connected to server" << std::endl;
+    return true;
 }
+
+// 서버로 메시지 전송
+void ChatClient::sendMessage(uint32_t senderID, const char* message) {
+    PacketHeader header;
+    header.packetType = 0x01;
+    header.senderID = senderID;
+    header.dataLength = strlen(message);
+
+    send(socketDescriptor, (const char*)&header, sizeof(PacketHeader), 0);
+    send(socketDescriptor, message, header.dataLength, 0);
+}
+
+// 서버로부터 메시지 수신
+void ChatClient::receiveMessage() {
+    char buffer[1024];
+    PacketHeader header;
+
+    int recvSize = recv(socketDescriptor, (char*)&header, sizeof(PacketHeader), 0);
+    if (recvSize > 0) {
+        recv(socketDescriptor, buffer, header.dataLength, 0);
+        std::cout << "Message from server: " << buffer << std::endl;
+    }
+}
+

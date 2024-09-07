@@ -133,10 +133,12 @@
     <ClCompile Include="..\common\Packet.cpp" />
     <ClCompile Include="..\common\SocketHandler.cpp" />
     <ClCompile Include="ChatServer.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\common\Packet.h" />
     <ClInclude Include="..\common\SocketHandler.h" />
+    <ClInclude Include="ChatServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
