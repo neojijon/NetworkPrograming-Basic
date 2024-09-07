@@ -1,10 +1,9 @@
-﻿#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+﻿#include <string.h>
 #include <thread>
 #include <vector>
 #include <mutex>
 #include "../common/Packet.h"
+#include "../common/SocketHandler.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
