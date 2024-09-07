@@ -2,24 +2,10 @@
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <thread>
 
 #include "ChatServer.h"
 
-#pragma comment(lib, "ws2_32.lib")
-
-#define SERVER_PORT 8888
-#define MAX_CLIENTS 100
-#define BUFFER_SIZE 1024
-
-std::vector<SOCKET> clients;
-std::mutex clientsMutex;
-
-
-ChatServer::ChatServer() 
-    : clientCount(0) 
-{
-    memset(clientSockets, 0, sizeof(clientSockets));
-}
 
 bool ChatServer::startServer(int port) 
 {
@@ -52,35 +38,52 @@ void ChatServer::acceptClient() {
     sockaddr_in clientAddr;
     int addrSize = sizeof(clientAddr);
 
-    newSocket = accept(socketDescriptor, (struct sockaddr*)&clientAddr, &addrSize);
-    if (newSocket == INVALID_SOCKET) {
-        std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
-    }
-    else {
-        clientSockets[clientCount++] = newSocket;
-        std::cout << "Client connected. Total clients: " << clientCount << std::endl;
-    }
-}
-
-// 모든 클라이언트에게 메시지 브로드캐스트
-void ChatServer::broadcastMessage(const char* message, PacketHeader header) {
-    for (int i = 0; i < clientCount; i++) {
-        send(clientSockets[i], (const char*)&header, sizeof(PacketHeader), 0);
-        send(clientSockets[i], message, header.dataLength, 0);
-    }
-}
-
-// 메시지를 받아 브로드캐스트
-void ChatServer::receiveAndBroadcast() {
-    char buffer[1024];
-    PacketHeader header;
-
-    for (int i = 0; i < clientCount; i++) {
-        int recvSize = recv(clientSockets[i], (char*)&header, sizeof(PacketHeader), 0);
-        if (recvSize > 0) {
-            recv(clientSockets[i], buffer, header.dataLength, 0);
-            std::cout << "Message received from client " << header.senderID << ": " << buffer << std::endl;
-            broadcastMessage(buffer, header);
+    while (true) {
+        newSocket = accept(socketDescriptor, (struct sockaddr*)&clientAddr, &addrSize);
+        if (newSocket != INVALID_SOCKET) {
+            clientSockets.push_back(newSocket);
+            clientThreads.push_back(std::thread(&ChatServer::handleClient, this, newSocket));
+            std::cout << "Client connected. Total clients: " << clientSockets.size() << std::endl;
         }
     }
 }
+
+void ChatServer::handleClient(SOCKET clientSocket) {
+    uint8_t buffer[1024];
+    PacketHeader header;
+
+    while (true) {
+        // 패킷 헤더를 먼저 받음
+        int recvSize = recv(clientSocket, (char*)&header, sizeof(PacketHeader), 0);
+        if (recvSize > 0) {
+            // 헤더에서 dataLength 만큼 데이터를 buffer에 읽음
+            recv(clientSocket, (char*)buffer, header.dataLength, 0);
+
+            // 패킷 타입에 따라 처리
+            switch (header.packetType) {
+            case PacketType::CHAT_MESSAGE: {
+                ChatMessagePacket chatPacket;
+                chatPacket.setData(std::vector<uint8_t>(buffer, buffer + header.dataLength));
+                std::cout << "Chat Message: " << chatPacket.getMessage() << std::endl;
+                break;
+            }
+            case PacketType::GROUP_MESSAGE: {
+                GroupMessagePacket groupPacket;
+                groupPacket.setData(std::vector<uint8_t>(buffer, buffer + header.dataLength));
+                std::cout << "Group Message: " << groupPacket.getGroupMessage() << std::endl;
+                break;
+            }
+            case PacketType::ANNOUNCEMENT: {
+                AnnouncementPacket announcementPacket;
+                announcementPacket.setData(std::vector<uint8_t>(buffer, buffer + header.dataLength));
+                std::cout << "Announcement: " << announcementPacket.getAnnouncement() << std::endl;
+                break;
+            }
+            default:
+                std::cerr << "Unknown packet type" << std::endl;
+                break;
+            }
+        }
+    }
+}
+

@@ -1,21 +1,34 @@
 #ifndef CHATCLIENT_H
 #define CHATCLIENT_H
 
-#include "../common/Packet.h"
 #include "../common/SocketHandler.h"
+#include "../common/ChatMessagePacket.h"
+#include "../common/GroupMessagePacket.h"
+#include "../common/AnnouncementPacket.h"
+#include <thread>
+#include <iostream>
 
-class ChatClient : public SocketHandler {
+class ChatClient : public SocketHandler 
+{
 private:
     sockaddr_in serverAddr;
+    std::thread receiveThread;
 
 public:
-    bool connectToServer(const char* serverIP, int port);
+    bool connectToServer(std::string serverIP, int port);
 
-    // 서버로 메시지 전송
-    void sendMessage(uint32_t senderID, const char* message);
+    // 채팅 메시지 전송
+    void sendChatMessage(uint32_t senderID, const std::string& message);
 
-    // 서버로부터 메시지 수신
-    void receiveMessage();
+    // 그룹 메시지 전송
+    void sendGroupMessage(uint32_t senderID, const std::string& message);
+
+    // 공지 메시지 전송
+    void sendAnnouncement(const std::string& message);
+
+    // 서버에서 메시지 수신
+    void receiveMessages();
+
 };
 
 #endif // CHATCLIENT_H

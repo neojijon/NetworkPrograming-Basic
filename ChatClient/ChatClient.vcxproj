@@ -130,13 +130,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\common\Packet.cpp" />
+    <ClCompile Include="..\common\AnnouncementPacket.cpp" />
+    <ClCompile Include="..\common\BasePacket.cpp" />
+    <ClCompile Include="..\common\ChatMessagePacket.cpp" />
+    <ClCompile Include="..\common\GroupMessagePacket.cpp" />
     <ClCompile Include="..\common\SocketHandler.cpp" />
     <ClCompile Include="ChatClient.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\common\Packet.h" />
+    <ClInclude Include="..\common\AnnouncementPacket.h" />
+    <ClInclude Include="..\common\BasePacket.h" />
+    <ClInclude Include="..\common\ChatMessagePacket.h" />
+    <ClInclude Include="..\common\GroupMessagePacket.h" />
     <ClInclude Include="..\common\SocketHandler.h" />
     <ClInclude Include="ChatClient.h" />
   </ItemGroup>

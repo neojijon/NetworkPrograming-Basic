@@ -1,16 +1,42 @@
 #include "ChatClient.h"
+#include <iostream>
+#include <string>
 
-int main() {
+
+int main(int argc, char* argv[])
+{
+    // 기본값 설정
+    std::string serverIP = "127.0.0.1";
+    int port = 8888;
+
+    // 명령줄 인자 처리
+    if (argc > 1) {
+        serverIP = argv[1];
+    }
+    if (argc > 2) {
+        port = std::atoi(argv[2]);
+    }
+
+
     ChatClient client;
-    if (client.connectToServer("127.0.0.1", 8888)) 
+    if (client.connectToServer(serverIP, port))
     {
-        client.sendMessage(1, "Hello, Server!");
+        uint32_t userID = 1;  // 클라이언트에서 지정하는 유저 ID
+        std::string message;
 
-        while (true) 
-        {
-            client.receiveMessage();
+        while (true) {
+            std::cout << "Enter message: ";
+            std::getline(std::cin, message);
+
+            if (message == "/quit") break;
+
+            client.sendChatMessage(userID, message);
         }
     }
+    else {
+        std::cerr << "Failed to connect to server" << std::endl;
+    }
+
     return 0;
 }
 

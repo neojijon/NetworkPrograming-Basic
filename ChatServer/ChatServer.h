@@ -1,31 +1,31 @@
 #ifndef CHATSERVER_H
 #define CHATSERVER_H
 
-#include "../common/Packet.h"
 #include "../common/SocketHandler.h"
+#include "../common/BasePacket.h"
+#include "../common/ChatMessagePacket.h"
+#include "../common/GroupMessagePacket.h"
+#include "../common/AnnouncementPacket.h"
+
+#include <thread>
+#include <vector>
 
 
 class ChatServer : public SocketHandler 
 {
-private:
-    WSADATA wsa;
-    // 최대 100명의 클라이언트 처리
-    SOCKET clientSockets[100];
+private:        
     sockaddr_in serverAddr;
-    int clientCount;    
+    std::vector<SOCKET> clientSockets;
+    std::vector<std::thread> clientThreads;
 
 public:
-    ChatServer();
+    ChatServer() {}
 
     bool startServer(int port);
 
     void acceptClient();
 
-    // 모든 클라이언트에게 메시지 브로드캐스트
-    void broadcastMessage(const char* message, PacketHeader header);
-
-    // 메시지를 받아 브로드캐스트
-    void receiveAndBroadcast();
+    void handleClient(SOCKET clientSocket);
     
 };
 
